@@ -27,7 +27,7 @@ $rollups = array(
 
 foreach ($files as $file) {
 	mkdir("../build/$file");
-	$js = file_get_contents("../src/$file.js");
+	$js = file_get_contents(caseDesensitize("../src/$file.js"));
 	file_put_contents("../build/$file/$file.js", $copyrightInfo . $js);
 	file_put_contents("../build/$file/$file-min.js", $copyrightInfo . compress($js));
 }
@@ -36,7 +36,7 @@ foreach ($rollups as $rollup) {
 	$rollupName = implode("-", $rollup);
 	mkdir("../build/$rollupName");
 	$js = '';
-	foreach ($rollup as $file) $js .= file_get_contents("../src/$file.js");
+	foreach ($rollup as $file) $js .= file_get_contents(caseDesensitize("../src/$file.js"));
 	file_put_contents("../build/$rollupName/$rollupName.js", $copyrightInfo . compress($js));
 }
 
@@ -68,4 +68,22 @@ function compress($js) {
 
 	return $compressed;
 
+}
+
+// with some help from http://stackoverflow.com/a/3964927
+function caseDesensitize($filename) {
+    if (file_exists($filename)) {
+        return $filename;
+    }
+
+    $dir = dirname($filename);
+    $filenameLowered = strtolower($filename);
+    foreach (glob($dir . '/*', GLOB_NOSORT) as $file) {
+        if (strtolower($file) == $filenameLowered) {
+            return $file;
+        }
+    }
+
+    // just pass it through if we couldn't find it
+    return $filename;
 }
