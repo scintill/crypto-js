@@ -2,10 +2,10 @@
 
 // Shortcuts
 var C = Crypto,
-    util = C.util,
-    charenc = C.charenc,
-    UTF8 = charenc.UTF8,
-    Binary = charenc.Binary;
+	util = C.util,
+	charenc = C.charenc,
+	UTF8 = charenc.UTF8,
+	Binary = charenc.Binary;
 
 C.HMAC = function (hasher, message, key, options) {
 
@@ -20,17 +20,32 @@ C.HMAC = function (hasher, message, key, options) {
 
 	// XOR keys with pad constants
 	var okey = key.slice(0),
-	    ikey = key.slice(0);
+		ikey = key.slice(0);
 	for (var i = 0; i < hasher._blocksize * 4; i++) {
 		okey[i] ^= 0x5C;
 		ikey[i] ^= 0x36;
 	}
 
-	var hmacbytes = hasher(okey.concat(hasher(ikey.concat(message), { asBytes: true })), { asBytes: true });
+	var callback = options ? options.callback : undefined;
 
-	return options && options.asBytes ? hmacbytes :
-	       options && options.asString ? Binary.bytesToString(hmacbytes) :
-	       util.bytesToHex(hmacbytes);
+	var postproc = function(hmacbytes) {
+		var ret = options && options.asBytes ? hmacbytes :
+			   options && options.asString ? Binary.bytesToString(hmacbytes) :
+			   util.bytesToHex(hmacbytes);
+		if (callback) {
+			callback(ret);
+		} else {
+			return ret;
+		}
+	};
+
+	if (callback) {
+		hasher(ikey.concat(message), { asBytes: true, callback: function(ikeymessagehash) {
+			hasher(okey.concat(ikeymessagehash), { asBytes: true, callback: postproc });
+		}});
+	} else {
+		return postproc(hasher(okey.concat(hasher(ikey.concat(message), { asBytes: true })), { asBytes: true }));
+	}
 
 };
 

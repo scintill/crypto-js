@@ -27,98 +27,130 @@ var K = [ 0x428A2F98, 0x71374491, 0xB5C0FBCF, 0xE9B5DBA5,
 
 // Public API
 var SHA256 = C.SHA256 = function (message, options) {
-	var digestbytes = util.wordsToBytes(SHA256._sha256(message));
-	return options && options.asBytes ? digestbytes :
-	       options && options.asString ? Binary.bytesToString(digestbytes) :
-	       util.bytesToHex(digestbytes);
+	var callback = options && options.callback;
+
+	var postproc = function(digest) {
+		digest = util.wordsToBytes(digest);
+		digest = options && options.asBytes ? digest :
+			   options && options.asString ? Binary.bytesToString(digest) :
+			   util.bytesToHex(digest);
+		if (callback) {
+			callback(digest);
+		} else {
+			return digest;
+		}
+	};
+
+	if (callback) {
+		SHA256._sha256(message, postproc);
+	} else {
+		return postproc(SHA256._sha256(message));
+	}
 };
 
 // The core
-SHA256._sha256 = function (message) {
+SHA256._sha256 = function (message, callback) {
 
 	// Convert to byte array
 	if (message.constructor == String) message = UTF8.stringToBytes(message);
 	/* else, assume byte array already */
 
 	var m = util.bytesToWords(message),
-	    l = message.length * 8,
-	    H = [ 0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A,
-	          0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19 ],
-	    w = [],
-	    a, b, c, d, e, f, g, h, i, j,
-	    t1, t2;
+		l = message.length * 8,
+		H = [ 0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A,
+			  0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19 ],
+		w = [],
+		a, b, c, d, e, f, g, h, i, j,
+		t1, t2;
 
 	// Padding
 	m[l >> 5] |= 0x80 << (24 - l % 32);
 	m[((l + 64 >> 9) << 4) + 15] = l;
 
-	for (var i = 0; i < m.length; i += 16) {
+		var workOnChunk = function(i, H) {
+		for (; i < m.length; i += 16) {
 
-		a = H[0];
-		b = H[1];
-		c = H[2];
-		d = H[3];
-		e = H[4];
-		f = H[5];
-		g = H[6];
-		h = H[7];
+			a = H[0];
+			b = H[1];
+			c = H[2];
+			d = H[3];
+			e = H[4];
+			f = H[5];
+			g = H[6];
+			h = H[7];
 
-		for (var j = 0; j < 64; j++) {
+			for (var j = 0; j < 64; j++) {
 
-			if (j < 16) w[j] = m[j + i];
-			else {
+				if (j < 16) w[j] = m[j + i];
+				else {
 
-				var gamma0x = w[j - 15],
-				    gamma1x = w[j - 2],
-				    gamma0  = ((gamma0x << 25) | (gamma0x >>>  7)) ^
-				              ((gamma0x << 14) | (gamma0x >>> 18)) ^
-				               (gamma0x >>> 3),
-				    gamma1  = ((gamma1x <<  15) | (gamma1x >>> 17)) ^
-				              ((gamma1x <<  13) | (gamma1x >>> 19)) ^
-				               (gamma1x >>> 10);
+					var gamma0x = w[j - 15],
+						gamma1x = w[j - 2],
+						gamma0  = ((gamma0x << 25) | (gamma0x >>>  7)) ^
+							  ((gamma0x << 14) | (gamma0x >>> 18)) ^
+							   (gamma0x >>> 3),
+						gamma1  = ((gamma1x <<  15) | (gamma1x >>> 17)) ^
+							  ((gamma1x <<  13) | (gamma1x >>> 19)) ^
+							   (gamma1x >>> 10);
 
-				w[j] = gamma0 + (w[j - 7] >>> 0) +
-				       gamma1 + (w[j - 16] >>> 0);
+					w[j] = gamma0 + (w[j - 7] >>> 0) +
+						   gamma1 + (w[j - 16] >>> 0);
+
+				}
+
+				var ch  = e & f ^ ~e & g,
+					maj = a & b ^ a & c ^ b & c,
+					sigma0 = ((a << 30) | (a >>>  2)) ^
+						 ((a << 19) | (a >>> 13)) ^
+						 ((a << 10) | (a >>> 22)),
+					sigma1 = ((e << 26) | (e >>>  6)) ^
+						 ((e << 21) | (e >>> 11)) ^
+						 ((e <<  7) | (e >>> 25));
+
+
+				t1 = (h >>> 0) + sigma1 + ch + (K[j]) + (w[j] >>> 0);
+				t2 = sigma0 + maj;
+
+				h = g;
+				g = f;
+				f = e;
+				e = d + t1;
+				d = c;
+				c = b;
+				b = a;
+				a = t1 + t2;
 
 			}
 
-			var ch  = e & f ^ ~e & g,
-			    maj = a & b ^ a & c ^ b & c,
-			    sigma0 = ((a << 30) | (a >>>  2)) ^
-			             ((a << 19) | (a >>> 13)) ^
-			             ((a << 10) | (a >>> 22)),
-			    sigma1 = ((e << 26) | (e >>>  6)) ^
-			             ((e << 21) | (e >>> 11)) ^
-			             ((e <<  7) | (e >>> 25));
+			H[0] += a;
+			H[1] += b;
+			H[2] += c;
+			H[3] += d;
+			H[4] += e;
+			H[5] += f;
+			H[6] += g;
+			H[7] += h;
 
-
-			t1 = (h >>> 0) + sigma1 + ch + (K[j]) + (w[j] >>> 0);
-			t2 = sigma0 + maj;
-
-			h = g;
-			g = f;
-			f = e;
-			e = d + t1;
-			d = c;
-			c = b;
-			b = a;
-			a = t1 + t2;
+			// every 1600 bytes split into new timeout (if async)
+			if (callback && i && ((i % 1600) === 0)) {
+				window.setTimeout(function() { workOnChunk(i+16, H); }, 1);
+				return;
+			}
 
 		}
 
-		H[0] += a;
-		H[1] += b;
-		H[2] += c;
-		H[3] += d;
-		H[4] += e;
-		H[5] += f;
-		H[6] += g;
-		H[7] += h;
+		if (callback) {
+			callback(H);
+		} else {
+			return H;
+		}
+	};
 
+	if (callback) {
+		window.setTimeout(function() { workOnChunk(0, H); }, 0);
+	} else {
+		return workOnChunk(0, H);
 	}
-
-	return H;
-
 };
 
 // Package private blocksize

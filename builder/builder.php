@@ -32,8 +32,11 @@ foreach ($files as $file) {
 	file_put_contents("../build/$file/$file-min.js", $copyrightInfo . compress($js));
 }
 
-foreach ($rollups as $rollup) {
-	$rollupName = implode("-", $rollup);
+foreach ($rollups as $rollupName => $rollup) {
+	if (!is_string($rollupName)) {
+		$rollupName = implode("-", $rollup);
+	}
+
 	mkdir("../build/$rollupName");
 	$js = '';
 	foreach ($rollup as $file) $js .= file_get_contents(caseDesensitize("../src/$file.js"));
@@ -64,7 +67,7 @@ function compress($js) {
 
 	$exitStatus = proc_close($process);
 
-	if ($exitStatus != 0 or $errors != '') die();
+	if ($exitStatus != 0 or $errors != '') die($errors);
 
 	return $compressed;
 
