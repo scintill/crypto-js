@@ -114,11 +114,11 @@ SHA256._sha256 = function (message, callback) {
 				h = g;
 				g = f;
 				f = e;
-				e = d + t1;
+				e = (d + t1) >>> 0;
 				d = c;
 				c = b;
 				b = a;
-				a = t1 + t2;
+				a = (t1 + t2) >>> 0;
 
 			}
 
